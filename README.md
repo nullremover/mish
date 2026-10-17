@@ -64,7 +64,7 @@ when opening mish for the first time:
 2. let mish scan your library
 3. enjoy your music ✨
 
--Setup-
+## Setup
 <p align="center">
 <img src="assets/setup.png" width="700">
 </p>
