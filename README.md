@@ -54,23 +54,22 @@ mish is a very light music player focused on simplicity, nostalgia, and aestheti
 
 ## 🚀 Getting Started
 
-### First launch
+### First launch/Setup
 
 mish has a first-time setup wizard.
 
 when opening mish for the first time:
 
-1. choose your music folder
-2. let mish scan your library
-3. enjoy your music ✨
-
-## Setup
 <p align="center">
 <img src="assets/mish_config.png" width="700">
 <img src="assets/imgui.png" width="700">
 </p>
 These are created on initial setup. i cannot stress that you **DON'T** delete them.
-Start by picking out your music folder
+Start by picking out your music folder, as listed here:
+<p align="center">
+<img src="assets/setup_gui.png" width="900">
+</p>
+
 ## 📁 Important Files
 
 please do not delete:
@@ -93,22 +92,18 @@ these files store things like:
 things planned for future versions:
 
 - [ ] better playlist management
-- [ ] more visual effects
-- [ ] improved album art handling
+- [✓] more visual effects(visualizer/calm mode)
+- [✓] improved album art handling
 - [ ] equalizer
 - [ ] customizable themes
 - [ ] more audio formats
-- [ ] Linux support
+- [✓] Linux support
 
 ---
 
 ## 🐛 Known Issues
 
-because mish is still beta:
-
-- FLAC support may be unstable
-- some album art may not be detected
-- playlists/settings may change between versions
+because mish is still alpha, there may be issues. Fortunately, they are currently unknown, but don't hesitate to report!
 
 ---
 
