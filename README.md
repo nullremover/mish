@@ -10,7 +10,7 @@
 
 # mish 🎵
 
-<img src="assets/mish.png" width="150">
+<img src="assets/mishicon.png" width="150">
 
 **mish (C) 2026 by josh**
 
