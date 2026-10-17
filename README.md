@@ -69,6 +69,14 @@ Start by picking out your music folder, as listed here:
 <p align="center">
 <img src="assets/setup_gui.png" width="900">
 </p>
+then simply save your path:
+<p align="center">
+<img src="assets/selected.png" width="900">
+</p>
+and enjoy your music!
+<p align="center">
+<img src="assets/playergui.png" width="900">
+</p>
 
 ## 📁 Important Files
 
