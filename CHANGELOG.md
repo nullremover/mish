@@ -1,15 +1,18 @@
 # Changelog
 
-## v0.1.0-beta
+## v0.2.4-alpha
 
-Initial public beta release.
+Really far jump since last update(initial public beta)
 
 Added:
-- Album art detection
-- Playlist support
-- MP3/WAV/OGG playback
-- Visualizer
-- First-time setup wizard
+- calm mode
+- discord rpc
+
+Fixed:
+- repeat stuff
+- flac/wav support
 
 Known:
-- FLAC support is experimental
+- FLAC support is NO longer experimental, at least.
+Planned:
+- GUI that shows the track you are currently playing(similar to Winamp) as a toast/notification on the bottom right of your screen. 
