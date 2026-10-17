@@ -66,9 +66,11 @@ when opening mish for the first time:
 
 ## Setup
 <p align="center">
-<img src="assets/setup.png" width="700">
+<img src="assets/mish_config.png" width="700">
+<img src="assets/imgui.png" width="700">
 </p>
-
+These are created on initial setup. i cannot stress that you **DON'T** delete them.
+Start by picking out your music folder
 ## 📁 Important Files
 
 please do not delete:
