@@ -69,21 +69,6 @@ when opening mish for the first time:
 <img src="assets/setup.png" width="700">
 </p>
 
----
-
-## 🎮 Controls
-
-| Action | Key |
-|-|-|
-| Play/Pause | Space |
-| Next song | → |
-| Previous song | ← |
-| Volume | Mouse |
-
-*(update this section when controls are finalized)*
-
----
-
 ## 📁 Important Files
 
 please do not delete:
