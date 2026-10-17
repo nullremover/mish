@@ -26,22 +26,21 @@
 
 > a minimalist music player, designed as a love letter to the 2000s.
 
-mish is a small, lightweight music player focused on simplicity, nostalgia, and looking cool while doing it.
+mish is a very light music player focused on simplicity, nostalgia, and aesthetic.
 
-⚠️ mish is currently in early beta. Expect bugs, weirdness, and unfinished features + i coded this a while ago, so unsure
-
+⚠️ mish is currently in early ALPHA. If you find any bugs, don't hesitate to report!
 ---
 
 ## ✨ Features
 
 - 🎨 sick ass visuals
 - 🖼️ automatic album art detection
-- 📂 playlist support
-- 🔍 automatic music folder scanning
-- 🎧 MP3 / WAV / OGG support
-- 🧊 FLAC support *(experimental)*
+- 📂 playlist support(soon*)
+- 🔍 automatic music folder scanning(You can use "Force Scan" to update your tracks; auto-scan is every 2 minutes)
+- 🎧 MP3 / WAV / OGG support(id3 tags)
+- 🧊 FLAC support (CONFIRMED!)
 - 💾 remembers your settings
-- 🖥️ lightweight desktop app
+- 🖥️ lightweight desktop app (only 13MB!)
 
 ---
 
@@ -64,6 +63,11 @@ when opening mish for the first time:
 1. choose your music folder
 2. let mish scan your library
 3. enjoy your music ✨
+
+-Setup-
+<p align="center">
+<img src="assets/setup.png" width="700">
+</p>
 
 ---
 
