@@ -12,6 +12,9 @@ public:
     void update(const sf::Sound& sound, const sf::SoundBuffer& buffer);
     void draw(sf::RenderWindow& window);
 
+    // Resize the internal buffers to match the window (keeps the visuals centred, unstretched)
+    void resize(unsigned int width, unsigned int height);
+
     // Switch between full chaos mode and NCS-style calm mode
     void setCalmMode(bool enabled);
 	void toggleCalmMode();

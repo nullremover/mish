@@ -8,11 +8,12 @@ CXXFLAGS = -I. -DSFML_STATIC -DIMGUI_SFML_STATIC -DTAGLIB_STATIC -O2 -ltag
 LDFLAGS = -static -static-libgcc -static-libstdc++ \
           -lsfml-graphics-s -lsfml-window-s -lsfml-audio-s -lsfml-system-s \
           -lopenal -lflac -lvorbisenc -lvorbisfile -lvorbis -logg \
-          -lopengl32 -lole32 -luuid -lwinmm -lgdi32 -luser32 -lkernel32 -lavrt \
-          -ltag -lz -mwindows
+          -lopengl32 -lole32 -luuid -lfreetype -lbz2 -lharfbuzz -lgraphite2 -lrpcrt4 -ldwrite \
+	  -lwinmm -lgdi32 -luser32 -lkernel32 -lavrt -lpng -lbrotlidec -lbrotlicommon \
+          -ltag -lz -mwindows -lwinhttp
 		  
 # Source Files
-SRCS = mishplay.cpp visualizer.cpp imgui.cpp imgui_draw.cpp imgui_widgets.cpp imgui_tables.cpp imgui-SFML.cpp platform-win.cpp
+SRCS = mishplay.cpp visualizer.cpp imgui.cpp imgui_draw.cpp imgui_widgets.cpp imgui_tables.cpp imgui-SFML.cpp platform-win.cpp discordrpc.cpp nowplaying_popup.cpp
 OBJS = $(SRCS:.cpp=.o) resource.o
 
 # Output Directory

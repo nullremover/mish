@@ -8,6 +8,31 @@
 typedef std::complex<float> Complex;
 const float PI = 3.14159265358979323846f;
 
+// ---------------------------------------------------------------------------
+// Calm mode tuning knobs
+// ---------------------------------------------------------------------------
+// Which of the 512 log-spaced bars the circle covers (bar 90 ~ 65 Hz, bar 470 ~ 9 kHz).
+// The bars below ~65 Hz all come from the same 3-4 FFT bins (DC leakage + sub-bass),
+// so they were hogging a third of the circle with one big smooth lump.
+const int   CALM_LOW_BAR     = 90;
+const int   CALM_HIGH_BAR    = 470;
+
+// Spectral tilt: music loses energy as frequency rises, so boost highs / cut lows.
+// 0 = no correction (old behaviour), ~0.5 = roughly flat for typical music.
+const float CALM_TILT        = 0.5f;
+
+// How many pixels of movement per unit of (tilted) magnitude, and the most the
+// shape may ever grow. Excess is soft-clipped, so loud bands round off
+// instead of hitting a hard flat ceiling.
+const float CALM_GAIN        = 200.0f;
+const float CALM_MAX_WAVE    = 350.0f;
+
+const float CALM_BASE_RADIUS = 225.0f;
+
+// Where the bass sits on the circle. PI/2 = bottom (shape is left/right symmetric),
+// -PI/2 = top, 0 = right side (old behaviour).
+const float CALM_ANGLE_OFFSET = PI / 2.0f;
+
 // Cooley-Tukey FFT
 void runFFT(std::vector<Complex>& a) {
     size_t n = a.size();
@@ -48,6 +73,30 @@ Visualizer::Visualizer(unsigned int width, unsigned int height)
 
     // Dynamic central ring driven by audio peaks
     m_innerRing = sf::VertexArray(sf::PrimitiveType::TriangleFan, 362); 
+}
+
+// Resize the off-screen buffers to match the window, so the visualizer is drawn
+// 1:1 (no stretching) and stays centred (m_width/m_height drive the centre point).
+void Visualizer::resize(unsigned int width, unsigned int height)
+{
+    if (width == 0 || height == 0)
+        return; // minimised window
+    if (width == m_width && height == m_height)
+        return;
+
+    m_width = width;
+    m_height = height;
+
+    (void)m_primaryBuffer.resize({width, height});
+    (void)m_feedbackBuffer.resize({width, height});
+
+    m_primaryBuffer.clear(sf::Color::Black);
+    m_primaryBuffer.display();
+    m_feedbackBuffer.clear(sf::Color::Black);
+    m_feedbackBuffer.display();
+
+    // The texture was re-created at a new size, so reset the sprite's texture rect too
+    m_feedbackSprite.setTexture(m_feedbackBuffer.getTexture(), true);
 }
 
 void Visualizer::toggleCalmMode()
@@ -148,6 +197,35 @@ void Visualizer::update(const sf::Sound& sound, const sf::SoundBuffer& buffer) {
     const int points = 128;
     const int halfPoints = points / 2;
 
+    // --- 0. PRE-COMPUTE THE WAVE HEIGHT FOR EACH POINT ---
+    // One value per mirrored point (0 = bass ... halfPoints = treble). Each point
+    // averages a small window of neighbouring bars (instead of sampling a single
+    // bar), applies the spectral tilt, then soft-clips. That fixes both the
+    // blown-out bass side and the spiky treble side.
+    float wave[halfPoints + 1];
+    const float slotWidth = static_cast<float>(CALM_HIGH_BAR - CALM_LOW_BAR) / halfPoints;
+
+    for (int p = 0; p <= halfPoints; p++)
+    {
+        float centerBar = CALM_LOW_BAR + (p / static_cast<float>(halfPoints)) * (CALM_HIGH_BAR - CALM_LOW_BAR);
+
+        // Window is +/- one slot wide, so neighbouring points overlap and blend smoothly
+        int lo = std::max(0, static_cast<int>(std::floor(centerBar - slotWidth)));
+        int hi = std::min(511, static_cast<int>(std::ceil(centerBar + slotWidth)));
+
+        float sum = 0.0f;
+        for (int b = lo; b <= hi; b++)
+        {
+            float freq = 20.0f * std::pow(800.0f, b / 512.0f); // same log mapping as the FFT bars
+            float tilt = std::pow(freq / 1000.0f, CALM_TILT);
+            sum += m_magnitudes[b] * tilt;
+        }
+        float level = sum / (hi - lo + 1);
+
+        // Soft clip: ~linear for small values, rounds off smoothly towards CALM_MAX_WAVE
+        wave[p] = CALM_MAX_WAVE * std::tanh(level * CALM_GAIN / CALM_MAX_WAVE);
+    }
+
     // --- 1. FILLED PORTAL MESH ---
     sf::VertexArray portal(
         sf::PrimitiveType::TriangleFan,
@@ -160,17 +238,14 @@ void Visualizer::update(const sf::Sound& sound, const sf::SoundBuffer& buffer) {
 
     for (int i = 0; i <= points; i++)
     {
-        float angle = (i / static_cast<float>(points)) * 2.0f * PI;
+        float angle = (i / static_cast<float>(points)) * 2.0f * PI + CALM_ANGLE_OFFSET;
 
         // Mirror frequencies (0..64 rises bass->treble, 64..128 falls treble->bass)
         int mirroredI = (i <= halfPoints) ? i : (points - i);
-        int freq = std::min(511, (mirroredI * 512) / halfPoints);
 
-        float wave = m_magnitudes[freq] * 12.0f; 
         float breathing = std::sin(time * 2.0f + i * 0.15f) * 4.0f;
 
-        // Base radius 45px + max wave capped at 80px + breathe
-        float radius = 45.0f + std::min(wave, 80.0f) + breathing;
+        float radius = CALM_BASE_RADIUS + wave[mirroredI] + breathing;
 
         portal[i + 1].position = {
             center.x + std::cos(angle) * radius,
@@ -190,13 +265,11 @@ void Visualizer::update(const sf::Sound& sound, const sf::SoundBuffer& buffer) {
 
     for (int i = 0; i <= points; i++)
     {
-        float angle = (i / static_cast<float>(points)) * 2.0f * PI;
+        float angle = (i / static_cast<float>(points)) * 2.0f * PI + CALM_ANGLE_OFFSET;
 
         int mirroredI = (i <= halfPoints) ? i : (points - i);
-        int freq = std::min(511, (mirroredI * 512) / halfPoints);
 
-        float wave = m_magnitudes[freq] * 12.0f;
-        float radius = 45.0f + std::min(wave, 80.0f);
+        float radius = CALM_BASE_RADIUS + wave[mirroredI];
 
         outline[i].position = {
             center.x + std::cos(angle) * radius,
@@ -227,7 +300,7 @@ void Visualizer::update(const sf::Sound& sound, const sf::SoundBuffer& buffer) {
 }
 
     // --- PHASE 1: THE FEEDBACK CYCLONE WARP ---
-    m_feedbackSprite.setTexture(m_feedbackBuffer.getTexture());
+    m_feedbackSprite.setTexture(m_feedbackBuffer.getTexture(), true);
     m_feedbackSprite.setOrigin({m_width / 2.0f, m_height / 2.0f});
 
     // Subtly drift the screen center while injecting high-speed bass jitter (Combining styles!)

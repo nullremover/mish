@@ -23,6 +23,11 @@
 #include <platform.h>
 #include <iostream>
 #include <algorithm>
+#include <cstdlib>
+#include "pathutil.h"
+#include "discord_config.h"
+#include "discordrpc.h"
+#include "nowplaying_popup.h"
 
 
 
@@ -40,7 +45,11 @@ struct Track {
     std::string album;
     
     // Embedded Album Art
-    std::shared_ptr<sf::Texture> albumArt = nullptr; 
+    std::shared_ptr<sf::Texture> albumArt = nullptr;
+
+    // The exact filesystem path. Open files with THIS (Unicode-safe); fullPath is a UTF-8 copy
+    // used for display, comparisons and Discord.
+    fs::path path; 
 };
 
 
@@ -58,11 +67,11 @@ void extractMetadata(Track& track) {
     // Read normal metadata
     // ----------------------------
 
-    TagLib::FileRef f(track.fullPath.c_str());
+    TagLib::FileRef f(track.path.c_str()); // wide path on Windows: handles any character
 	
 	std::cout << "Opening path: " << track.fullPath << "\n";
 	std::cout << "Exists: "
-          << std::filesystem::exists(track.fullPath)
+          << std::filesystem::exists(track.path)
           << "\n";
 
     if (!f.isNull() && f.tag()) {
@@ -300,24 +309,115 @@ std::string loadConfig() {
     return "";
 }
 
+static std::string lowerAscii(std::string s) {
+    for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return s;
+}
+
 std::vector<Track> scanMusicFolder(const std::string& folderPath) {
     std::vector<Track> playlist;
     if (!fs::exists(folderPath) || !fs::is_directory(folderPath)) return playlist;
-    for (const auto& entry : fs::directory_iterator(folderPath)) {
-        if (entry.is_regular_file()) {
-            std::string ext = entry.path().extension().string();
-            for (char &c : ext) c = std::tolower(c);
-            if (ext == ".mp3" || ext == ".ogg" || ext == ".wav" || ext == ".flac") {
-                // 1. Add the basic track to the playlist
-                playlist.push_back({entry.path().filename().string(), entry.path().string()});
-                
-                // 2. Extract metadata using the last item in the vector
-                extractMetadata(playlist.back());
-            }
+
+    try {
+        for (const auto& entry : fs::recursive_directory_iterator(folderPath, fs::directory_options::skip_permission_denied)) {
+            if (!entry.is_regular_file()) continue;
+
+            const std::string ext = lowerAscii(pathutil::toUtf8(entry.path().extension()));
+            if (ext != ".mp3" && ext != ".ogg" && ext != ".wav" && ext != ".flac") continue;
+
+            // 1. Add the basic track to the playlist
+            Track track;
+            track.path = entry.path();                                   // exact path, used to open the file
+            track.fullPath = pathutil::toUtf8(entry.path());             // UTF-8 copy for display/compare/Discord
+            track.filename = pathutil::toUtf8(entry.path().filename());
+            playlist.push_back(std::move(track));
+
+            // 2. Extract metadata using the last item in the vector
+            extractMetadata(playlist.back());
         }
+    } catch (const fs::filesystem_error& e) {
+        std::cerr << "[Filesystem Error during scan]: " << e.what() << '\n';
     }
+
+    // The recursive iterator returns files in an arbitrary order: sort so tracks are grouped by
+    // folder and the order is the same on every scan (and on every OS).
+    std::sort(playlist.begin(), playlist.end(), [](const Track& a, const Track& b) {
+        return lowerAscii(a.fullPath) < lowerAscii(b.fullPath);
+    });
+
     return playlist;
 }
+// ImGui's built-in font only has basic Latin, so characters like a star or a note show up as "?".
+// Merge in system fonts that cover accents, Greek/Cyrillic, symbols (and Japanese if installed).
+static void addMergedFont(const std::vector<std::string>& candidates, float size, const ImWchar* ranges)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    ImFontConfig cfg;
+    cfg.MergeMode = true;
+    cfg.PixelSnapH = true;
+    for (const std::string& file : candidates) {
+        std::error_code ec;
+        if (!fs::exists(fs::path(file), ec)) continue;
+        if (io.Fonts->AddFontFromFileTTF(file.c_str(), size, &cfg, ranges)) return;
+    }
+}
+
+static void setupUiFonts()
+{
+    ImGuiIO& io = ImGui::GetIO();
+    io.Fonts->AddFontDefault(); // keep the current look for plain text
+
+    static const ImWchar textRanges[] = {
+        0x0100, 0x024F, // Latin Extended
+        0x0370, 0x03FF, // Greek
+        0x0400, 0x052F, // Cyrillic
+        0
+    };
+    static const ImWchar symbolRanges[] = {
+        0x2000, 0x206F, // punctuation
+        0x2190, 0x21FF, // arrows
+        0x2300, 0x23FF, // technical
+        0x2500, 0x25FF, // shapes
+        0x2600, 0x27BF, // misc symbols + dingbats (stars, notes, hearts...)
+        0x2B00, 0x2BFF, // more symbols and arrows
+        0
+    };
+
+    std::vector<std::string> textFonts, symbolFonts, cjkFonts;
+#ifdef _WIN32
+    const char* winDir = std::getenv("WINDIR");
+    const std::string fonts = std::string(winDir ? winDir : "C:\\Windows") + "\\Fonts\\";
+    textFonts   = { fonts + "segoeui.ttf", fonts + "arial.ttf" };
+    symbolFonts = { fonts + "seguisym.ttf" };
+    cjkFonts    = { fonts + "YuGothM.ttc", fonts + "msgothic.ttc", fonts + "meiryo.ttc" };
+#else
+    textFonts = {
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans.ttf"
+    };
+    symbolFonts = textFonts;
+    cjkFonts = {
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc"
+    };
+#endif
+
+    // ImGui 1.92+ (dynamic fonts): the built-in font has an "implicit" size, so merged fonts
+    // must use size 0 too (an explicit size trips an assert). Older ImGui needs a real size.
+#if defined(IMGUI_VERSION_NUM) && IMGUI_VERSION_NUM >= 19200
+    const float mergedSize = 0.0f;
+#else
+    const float mergedSize = 13.0f;
+#endif
+    addMergedFont(textFonts,   mergedSize, textRanges);
+    addMergedFont(symbolFonts, mergedSize, symbolRanges);
+    addMergedFont(cjkFonts,    mergedSize, io.Fonts->GetGlyphRangesJapanese());
+
+    ImGui::SFML::UpdateFontTexture();
+}
+
 int main() {
     sf::RenderWindow window(
 		sf::VideoMode(sf::Vector2u(1024, 768)),
@@ -341,10 +441,21 @@ int main() {
 		static_cast<int>((desktop.size.y - window.getSize().y) / 2)
 	));
 
-    if (!ImGui::SFML::Init(window)) {
+    if (!ImGui::SFML::Init(window, false)) {
         std::cerr << "Failed to initialize ImGui-SFML\n";
         return -1;
     }
+    setupUiFonts(); // after Init(window, false): load our own fonts
+
+    // Discord Rich Presence (the Application ID is set in discord_config.h)
+    DiscordRPC::init(kDiscordAppId);
+
+    // Winamp-style "now playing" pop-up (bottom-right corner of the screen)
+    NowPlayingPopup nowPlaying;
+    const bool popupAvailable = nowPlaying.init();
+    window.requestFocus(); // creating the pop-up window can briefly steal focus
+    bool popupEnabled = true;
+    std::string lastNotifiedPath;
 
     sf::SoundBuffer buffer;
     std::optional<sf::Sound> sound; 
@@ -355,6 +466,10 @@ int main() {
     std::string savedPath = loadConfig();
     std::vector<Track> tracks;
     int currentTrackIndex = -1;
+
+    // True when the user pressed "stop" (so auto-advance must not kick in).
+    // Declared once here so it persists across frames.
+    bool userStopped = false;
 	
 	enum class RepeatMode {
 		Off,
@@ -368,7 +483,7 @@ int main() {
         tracks = scanMusicFolder(savedPath);
         if (!tracks.empty()) {
             currentTrackIndex = 0;
-            if (buffer.loadFromFile(tracks[currentTrackIndex].fullPath)) {
+            if (buffer.loadFromFile(tracks[currentTrackIndex].path)) {
                 sound.emplace(buffer); 
                 setupDone = true;
             }
@@ -386,6 +501,18 @@ int main() {
 			if (event->is<sf::Event::Closed>())
 			{
 				window.close();
+			}
+			else if (const auto* resized = event->getIf<sf::Event::Resized>())
+			{
+				// Ignore minimise (0x0). Otherwise make the view 1:1 with the window's
+				// pixels (stops SFML stretching the scene) and resize the visualizer.
+				if (resized->size.x > 0 && resized->size.y > 0)
+				{
+					window.setView(sf::View(sf::FloatRect(
+						{0.f, 0.f},
+						sf::Vector2f(resized->size))));
+					visualizer.resize(resized->size.x, resized->size.y);
+				}
 			}
 		}
 
@@ -405,14 +532,16 @@ int main() {
         if (sound.has_value()) {
             visualizer.update(*sound, buffer);
         }
+
 		// Automatic song advancing
 		if (sound.has_value() &&
+			!userStopped &&
 			sound->getStatus() == sf::Sound::Status::Stopped &&
 			currentTrackIndex != -1)
 		{
 
 			if (repeatMode == RepeatMode::Track) {
-
+				userStopped = false;
 				sound->play();
 			}
 
@@ -424,9 +553,10 @@ int main() {
 					currentTrackIndex = 0;
 				}
 
-				if (buffer.loadFromFile(tracks[currentTrackIndex].fullPath)) {
+				if (buffer.loadFromFile(tracks[currentTrackIndex].path)) {
 
 					sound.emplace(buffer);
+					userStopped = false;
 					sound->play();
 				}
 			}
@@ -438,12 +568,18 @@ int main() {
 
 					currentTrackIndex++;
 
-					if (buffer.loadFromFile(tracks[currentTrackIndex].fullPath)) {
+					if (buffer.loadFromFile(tracks[currentTrackIndex].path)) {
 
 						sound.emplace(buffer);
+						userStopped = false;
 						sound->play();
 					}
 
+				}
+				else {
+					// Last track finished: mark the playlist as done so this
+					// block doesn't keep re-running every frame.
+					userStopped = true;
 				}
 			}
 		}
@@ -493,7 +629,7 @@ int main() {
 					savedPath = pathStr;
 					saveConfig(savedPath);
 					currentTrackIndex = 0;
-					if (buffer.loadFromFile(tracks[currentTrackIndex].fullPath)) {
+					if (buffer.loadFromFile(tracks[currentTrackIndex].path)) {
 						sound.emplace(buffer); 
 						setupDone = true; 
 						autoScanClock.restart();
@@ -536,6 +672,7 @@ int main() {
 
             if (!isPlaying) {
                 if (ImGui::Button("play") && currentTrackIndex != -1) {
+                    userStopped = false;
                     if (sound.has_value()) sound->play();
                 }
             } else {
@@ -545,6 +682,7 @@ int main() {
             }
             ImGui::SameLine();
             if (ImGui::Button("stop")) {
+                userStopped = true;
                 if (sound.has_value()) sound->stop();
             }
             ImGui::SameLine();
@@ -552,9 +690,10 @@ int main() {
                 if (!tracks.empty() && currentTrackIndex < (int)tracks.size() - 1) {
                     currentTrackIndex++;
                     if (sound.has_value()) sound->stop();
-                    if (buffer.loadFromFile(tracks[currentTrackIndex].fullPath)) {
+                    if (buffer.loadFromFile(tracks[currentTrackIndex].path)) {
                         sound.emplace(buffer);
 						sound->setPlayingOffset(sf::seconds(0));
+						userStopped = false;
 						sound->play();
                     }
                 }
@@ -564,14 +703,25 @@ int main() {
                 if (!tracks.empty() && currentTrackIndex > 0) {
                     currentTrackIndex--;
                     if (sound.has_value()) sound->stop();
-                    if (buffer.loadFromFile(tracks[currentTrackIndex].fullPath)) {
+                    if (buffer.loadFromFile(tracks[currentTrackIndex].path)) {
 						sound.emplace(buffer);
 						sound->setPlayingOffset(sf::seconds(0));
+						userStopped = false;
 						sound->play();
                     }
                 }
             }
 			ImGui::SameLine();
+            if(ImGui::Button("shuffle")) {
+                std::random_shuffle(tracks.begin(), tracks.end());
+                currentTrackIndex = 0;
+                if (sound.has_value()) sound->stop();
+                if (buffer.loadFromFile(tracks[currentTrackIndex].path)) {
+                    sound.emplace(buffer);
+                    userStopped = false;
+                    sound->play();
+                }
+            }
             if (ImGui::Button(
                 visualizer.isCalmMode() ? "Visualizer: Calm" : "Visualizer: Portal"
             ))
@@ -634,6 +784,10 @@ int main() {
 					repeatMode = RepeatMode::Off;
 				}
 			}
+			ImGui::SameLine();
+			if (ImGui::Checkbox("popup", &popupEnabled)) {
+				if (!popupEnabled) nowPlaying.hide();
+			}
 			// --- SEEK BAR ---
 			if (sound.has_value() && currentTrackIndex >= 0) {
 
@@ -673,8 +827,9 @@ int main() {
                 if (ImGui::Selectable(tracks[i].filename.c_str(), isSelected)) {
                     currentTrackIndex = i;
                     if (sound.has_value()) sound->stop();
-                    if (buffer.loadFromFile(tracks[currentTrackIndex].fullPath)) {
+                    if (buffer.loadFromFile(tracks[currentTrackIndex].path)) {
                         sound.emplace(buffer); 
+                        userStopped = false;
                         sound->play();
                     }
                 }
@@ -691,7 +846,11 @@ int main() {
             }
             ImGui::End();
         }
-			if (setupDone && !tracks.empty()) {
+
+		// Guard against currentTrackIndex being -1 (e.g. after a rescan that
+		// didn't find the playing file) or out of range.
+		if (setupDone && !tracks.empty() &&
+			currentTrackIndex >= 0 && currentTrackIndex < (int)tracks.size()) {
 		// Access the current track metadata
 		const Track& currentTrack = tracks[currentTrackIndex];
 
@@ -742,14 +901,63 @@ int main() {
 		ImGui::End();
 	}
 
+        // --- Track-change pop-up: shown when a different track starts playing ---
+        if (setupDone && sound.has_value() &&
+            currentTrackIndex >= 0 && currentTrackIndex < (int)tracks.size())
+        {
+            const Track& t = tracks[currentTrackIndex];
+            const auto status = sound->getStatus();
+
+            if (status == sf::Sound::Status::Playing) {
+                if (t.fullPath != lastNotifiedPath) {
+                    lastNotifiedPath = t.fullPath;
+                    if (popupAvailable && popupEnabled)
+                        nowPlaying.show(t.title, t.artist, t.album, t.albumArt);
+                }
+            } else if (status == sf::Sound::Status::Stopped) {
+                lastNotifiedPath.clear(); // pressing play again shows it again
+            }
+        }
+
+        // --- Discord Rich Presence (only talks to Discord when something changes) ---
+        if (setupDone && sound.has_value() &&
+            currentTrackIndex >= 0 && currentTrackIndex < (int)tracks.size())
+        {
+            const Track& t = tracks[currentTrackIndex];
+
+            DiscordRPC::Presence presence;
+            presence.title  = t.title;
+            presence.artist = t.artist;
+            presence.album  = t.album;
+            presence.filePath = t.fullPath;
+            presence.positionSeconds = sound->getPlayingOffset().asSeconds();
+            presence.durationSeconds = buffer.getDuration().asSeconds();
+
+            switch (sound->getStatus()) {
+                case sf::Sound::Status::Playing: presence.state = DiscordRPC::PlayState::Playing; break;
+                case sf::Sound::Status::Paused:  presence.state = DiscordRPC::PlayState::Paused;  break;
+                default:                         presence.state = DiscordRPC::PlayState::Stopped; break;
+            }
+            DiscordRPC::setPresence(presence);
+        }
+        else
+        {
+            DiscordRPC::setPresence({}); // Stopped -> clears the presence
+        }
+
         window.clear(sf::Color(10, 10, 12));
         
         visualizer.draw(window);
         
         ImGui::SFML::Render(window);
         window.display();
+
+        // Draw the pop-up (it's its own little window), then go back to the main window
+        nowPlaying.update();
+        window.setActive(true);
     }
 
+    DiscordRPC::shutdown();
     ImGui::SFML::Shutdown();
     return 0;
 }
