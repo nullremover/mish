@@ -28,6 +28,7 @@
 #include "discord_config.h"
 #include "discordrpc.h"
 #include "nowplaying_popup.h"
+#include <random>
 
 
 
@@ -712,10 +713,14 @@ int main() {
                 }
             }
 			ImGui::SameLine();
-            if(ImGui::Button("shuffle")) {
-                std::random_shuffle(tracks.begin(), tracks.end());
+            if (ImGui::Button("shuffle") && !tracks.empty()) {
+                static std::mt19937 rng(std::random_device{}());
+            
+                std::shuffle(tracks.begin(), tracks.end(), rng);
                 currentTrackIndex = 0;
+            
                 if (sound.has_value()) sound->stop();
+            
                 if (buffer.loadFromFile(tracks[currentTrackIndex].path)) {
                     sound.emplace(buffer);
                     userStopped = false;
