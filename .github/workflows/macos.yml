@@ -232,3 +232,12 @@ jobs:
           name: MishPlayer-macOS-Universal
           path: release/MishPlayer.app
           if-no-files-found: error
+
+      - name: Run Mish debug session
+        run: |
+          set -o pipefail
+          cd "$GITHUB_WORKSPACE"
+
+          MISH_TEST_AUTOPLAY=1 \
+            ./release/MishPlayer.app/Contents/MacOS/mishplayer \
+            2>&1 | tee "$RUNNER_TEMP/mish-debug.log"
