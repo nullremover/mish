@@ -233,6 +233,15 @@ jobs:
           path: release/MishPlayer.app
           if-no-files-found: error
 
+      - name: Debug executable permissions
+      run: | 
+        APP="./release/MishPlayer.app/Contents/MacOS/mishplayer"
+        ls -l "$APP"
+        file "$APP"
+        test -f "$APP" && echo "Executable file exists"
+        chmod +x "$APP"
+        ls -l "$APP"
+
       - name: Run Mish debug session
         run: |
           set -o pipefail
