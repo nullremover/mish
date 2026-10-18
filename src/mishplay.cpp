@@ -24,6 +24,7 @@
 #include <iostream>
 #include <algorithm>
 #include <cstdlib>
+#include <random>
 #include "pathutil.h"
 #ifndef __APPLE__
 #include "discord_config.h"
@@ -720,17 +721,8 @@ int main() {
                     }
                 }
             }
-			ImGui::SameLine();
-            if(ImGui::Button("shuffle")) {
-                std::random_shuffle(tracks.begin(), tracks.end());
-                currentTrackIndex = 0;
-                if (sound.has_value()) sound->stop();
-                if (buffer.loadFromFile(tracks[currentTrackIndex].path)) {
-                    sound.emplace(buffer);
-                    userStopped = false;
-                    sound->play();
-                }
-            }
+			static std::mt19937 rng(std::random_device{}());
+            std::shuffle(tracks.begin(), tracks.end(), rng);
             if (ImGui::Button(
                 visualizer.isCalmMode() ? "Visualizer: Calm" : "Visualizer: Portal"
             ))
