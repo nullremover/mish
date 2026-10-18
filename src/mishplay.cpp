@@ -25,10 +25,11 @@
 #include <algorithm>
 #include <cstdlib>
 #include "pathutil.h"
+#ifndef __APPLE__
 #include "discord_config.h"
 #include "discordrpc.h"
 #include "nowplaying_popup.h"
-#include <random>
+#endif
 
 
 
@@ -448,6 +449,10 @@ int main() {
     }
     setupUiFonts(); // after Init(window, false): load our own fonts
 
+    // Look for updates off github.com/nullremover/mish(no UI first, just open window then UI)
+
+
+#ifndef __APPLE__
     // Discord Rich Presence (the Application ID is set in discord_config.h)
     DiscordRPC::init(kDiscordAppId);
 
@@ -457,6 +462,9 @@ int main() {
     window.requestFocus(); // creating the pop-up window can briefly steal focus
     bool popupEnabled = true;
     std::string lastNotifiedPath;
+#else
+    window.requestFocus();
+#endif
 
     sf::SoundBuffer buffer;
     std::optional<sf::Sound> sound; 
@@ -713,14 +721,10 @@ int main() {
                 }
             }
 			ImGui::SameLine();
-            if (ImGui::Button("shuffle") && !tracks.empty()) {
-                static std::mt19937 rng(std::random_device{}());
-            
-                std::shuffle(tracks.begin(), tracks.end(), rng);
+            if(ImGui::Button("shuffle")) {
+                std::random_shuffle(tracks.begin(), tracks.end());
                 currentTrackIndex = 0;
-            
                 if (sound.has_value()) sound->stop();
-            
                 if (buffer.loadFromFile(tracks[currentTrackIndex].path)) {
                     sound.emplace(buffer);
                     userStopped = false;
@@ -790,9 +794,11 @@ int main() {
 				}
 			}
 			ImGui::SameLine();
+#ifndef __APPLE__
 			if (ImGui::Checkbox("popup", &popupEnabled)) {
 				if (!popupEnabled) nowPlaying.hide();
 			}
+#endif
 			// --- SEEK BAR ---
 			if (sound.has_value() && currentTrackIndex >= 0) {
 
@@ -906,6 +912,7 @@ int main() {
 		ImGui::End();
 	}
 
+#ifndef __APPLE__
         // --- Track-change pop-up: shown when a different track starts playing ---
         if (setupDone && sound.has_value() &&
             currentTrackIndex >= 0 && currentTrackIndex < (int)tracks.size())
@@ -923,7 +930,9 @@ int main() {
                 lastNotifiedPath.clear(); // pressing play again shows it again
             }
         }
+#endif
 
+#ifndef __APPLE__
         // --- Discord Rich Presence (only talks to Discord when something changes) ---
         if (setupDone && sound.has_value() &&
             currentTrackIndex >= 0 && currentTrackIndex < (int)tracks.size())
@@ -949,6 +958,7 @@ int main() {
         {
             DiscordRPC::setPresence({}); // Stopped -> clears the presence
         }
+#endif
 
         window.clear(sf::Color(10, 10, 12));
         
@@ -957,12 +967,16 @@ int main() {
         ImGui::SFML::Render(window);
         window.display();
 
+#ifndef __APPLE__
         // Draw the pop-up (it's its own little window), then go back to the main window
         nowPlaying.update();
+#endif
         window.setActive(true);
     }
 
+#ifndef __APPLE__
     DiscordRPC::shutdown();
+#endif
     ImGui::SFML::Shutdown();
     return 0;
 }
