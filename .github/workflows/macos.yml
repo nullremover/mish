@@ -224,7 +224,7 @@ jobs:
           lipo -info "$EXECUTABLE"
           otool -L "$EXECUTABLE"
 
-          lipo -verify_arch arm64 x86_64 "$EXECUTABLE"
+          lipo "$EXECUTABLE" arm64 x86_64 "$EXECUTABLE"
 
       - name: Upload Universal App
         uses: actions/upload-artifact@v4
