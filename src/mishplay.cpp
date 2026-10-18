@@ -23,8 +23,8 @@
 #include <platform.h>
 #include <iostream>
 #include <algorithm>
-#include <cstdlib>
 #include <random>
+#include <cstdlib>
 #include "pathutil.h"
 #ifndef __APPLE__
 #include "discord_config.h"
@@ -477,6 +477,11 @@ int main() {
     std::vector<Track> tracks;
     int currentTrackIndex = -1;
 
+    std::cout << "[Config] Working directory: " << fs::current_path().string() << std::endl;
+    std::cout << "[Config] Config file: " << fs::absolute(CONFIG_FILE).string() << std::endl;
+    std::cout << "[Config] Music folder: "
+              << (savedPath.empty() ? "<not configured>" : savedPath) << std::endl;
+
     // True when the user pressed "stop" (so auto-advance must not kick in).
     // Declared once here so it persists across frames.
     bool userStopped = false;
@@ -491,14 +496,40 @@ int main() {
 
     if (!savedPath.empty() && fs::exists(savedPath) && fs::is_directory(savedPath)) {
         tracks = scanMusicFolder(savedPath);
+        std::cout << "[Library] Scan complete: " << tracks.size()
+                  << " supported audio file(s) found." << std::endl;
         if (!tracks.empty()) {
             currentTrackIndex = 0;
             if (buffer.loadFromFile(tracks[currentTrackIndex].path)) {
-                sound.emplace(buffer); 
+                sound.emplace(buffer);
                 setupDone = true;
+                std::cout << "[Audio] Loaded first track into SFML: "
+                          << tracks[currentTrackIndex].fullPath << std::endl;
+            } else {
+                std::cerr << "[Audio] ERROR: SFML could not load first track: "
+                          << tracks[currentTrackIndex].fullPath << std::endl;
             }
         }
+    } else {
+        std::cerr << "[Config] ERROR: configured music folder is missing or invalid." << std::endl;
     }
+
+    // Optional test hook for CI/remote GUI sessions. Set MISH_TEST_AUTOPLAY=1
+    // to start the first configured track automatically after loading it.
+    const char* testAutoplay = std::getenv("MISH_TEST_AUTOPLAY");
+    if (testAutoplay && std::string(testAutoplay) == "1") {
+        if (sound.has_value() && currentTrackIndex >= 0 && currentTrackIndex < (int)tracks.size()) {
+            std::cout << "[Test] MISH_TEST_AUTOPLAY=1; starting first track automatically." << std::endl;
+            userStopped = false;
+            sound->play();
+        } else {
+            std::cerr << "[Test] Autoplay requested, but no playable track was loaded." << std::endl;
+        }
+    }
+
+    std::string lastLoggedPlaybackPath;
+    sf::Sound::Status lastLoggedPlaybackStatus = sf::Sound::Status::Stopped;
+    bool loggedPlaybackState = false;
 
     sf::Clock deltaClock;
     sf::Clock autoScanClock;
@@ -721,8 +752,21 @@ int main() {
                     }
                 }
             }
-			static std::mt19937 rng(std::random_device{}());
-            std::shuffle(tracks.begin(), tracks.end(), rng);
+			ImGui::SameLine();
+            if(ImGui::Button("shuffle") && !tracks.empty()) {
+                static std::mt19937 rng(std::random_device{}());
+                std::shuffle(tracks.begin(), tracks.end(), rng);
+                currentTrackIndex = 0;
+                if (sound.has_value()) sound->stop();
+                if (buffer.loadFromFile(tracks[currentTrackIndex].path)) {
+                    sound.emplace(buffer);
+                    userStopped = false;
+                    sound->play();
+                } else {
+                    std::cerr << "[Audio] ERROR: SFML could not load shuffled track: "
+                              << tracks[currentTrackIndex].fullPath << std::endl;
+                }
+            }
             if (ImGui::Button(
                 visualizer.isCalmMode() ? "Visualizer: Calm" : "Visualizer: Portal"
             ))
@@ -951,6 +995,32 @@ int main() {
             DiscordRPC::setPresence({}); // Stopped -> clears the presence
         }
 #endif
+
+        // Log only when playback state or the active track changes, not every frame.
+        if (sound.has_value() && currentTrackIndex >= 0 && currentTrackIndex < (int)tracks.size()) {
+            const auto playbackStatus = sound->getStatus();
+            const std::string& playbackPath = tracks[currentTrackIndex].fullPath;
+            if (!loggedPlaybackState || playbackStatus != lastLoggedPlaybackStatus ||
+                playbackPath != lastLoggedPlaybackPath) {
+                const Track& playingTrack = tracks[currentTrackIndex];
+                if (playbackStatus == sf::Sound::Status::Playing) {
+                    std::cout << "[Playback] PLAYING: " << playingTrack.title
+                              << " | Artist: " << playingTrack.artist
+                              << " | Album: " << playingTrack.album
+                              << " | Path: " << playingTrack.fullPath
+                              << " | Embedded album art: "
+                              << (playingTrack.albumArt ? "loaded" : "not found/failed")
+                              << std::endl;
+                } else if (playbackStatus == sf::Sound::Status::Paused) {
+                    std::cout << "[Playback] PAUSED: " << playingTrack.title << std::endl;
+                } else {
+                    std::cout << "[Playback] STOPPED: " << playingTrack.title << std::endl;
+                }
+                lastLoggedPlaybackPath = playbackPath;
+                lastLoggedPlaybackStatus = playbackStatus;
+                loggedPlaybackState = true;
+            }
+        }
 
         window.clear(sf::Color(10, 10, 12));
         
