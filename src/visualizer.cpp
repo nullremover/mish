@@ -1,3 +1,5 @@
+//Copyright 2026 Joshua Cajayon.
+
 #include "visualizer.h"
 #include <cmath>
 #include <cstdint>
