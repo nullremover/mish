@@ -7,9 +7,25 @@ on:
       - main
 
 jobs:
-  build-arm64:
-    name: Build Apple Silicon
-    runs-on: macos-14
+  build:
+    name: Build ${{ matrix.label }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Apple Silicon
+            runner: macos-14
+            arch: arm64
+            binary: mishplayer-arm64
+            artifact: MishPlayer-macOS-Apple-Silicon
+
+          - label: Intel
+            runner: macos-15-intel
+            arch: x86_64
+            binary: mishplayer-x86_64
+            artifact: MishPlayer-macOS-Intel
+
+    runs-on: ${{ matrix.runner }}
 
     steps:
       - name: Checkout source
@@ -18,7 +34,7 @@ jobs:
       - name: Install dependencies
         run: brew install sfml taglib
 
-      - name: Build ARM64
+      - name: Build Mish
         working-directory: src
         run: |
           set -euo pipefail
@@ -29,50 +45,33 @@ jobs:
 
           make clean
           make -f Makefile.macos \
-            ARCH=arm64 \
+            ARCH=${{ matrix.arch }} \
             BREW_PREFIX="$brew_prefix"
 
           mkdir -p ../artifacts
-          cp builds/mishplayer-arm64 ../artifacts/mishplayer-arm64
+          cp "builds/${{ matrix.binary }}" \
+            "../artifacts/${{ matrix.binary }}"
 
-      - name: Upload ARM64 binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: mishplayer-arm64
-          path: artifacts/mishplayer-arm64
-          if-no-files-found: error
-
-  package-app:
-    name: Package Apple Silicon App
-    needs: build-arm64
-    runs-on: macos-14
-
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
-
-      - name: Download ARM64 binary
-        uses: actions/download-artifact@v4
-        with:
-          name: mishplayer-arm64
-          path: slices/arm64
-
-      - name: Install packaging dependencies
-        run: brew install sfml taglib
-
-      - name: Prepare app bundle
+      - name: Stage executable
         run: |
           set -euo pipefail
 
-          mkdir -p src/builds
-          cp slices/arm64/mishplayer-arm64 src/builds/mishplayer
-          chmod +x src/builds/mishplayer
+          APP="release/MishPlayer.app"
+          mkdir -p "$APP/Contents/MacOS"
+          mkdir -p "$APP/Contents/Frameworks"
+          mkdir -p "$APP/Contents/Resources"
 
-      - name: Stage dynamic libraries
+          cp "artifacts/${{ matrix.binary }}" \
+            "$APP/Contents/MacOS/mishplayer"
+
+          chmod +x "$APP/Contents/MacOS/mishplayer"
+
+      - name: Bundle dynamic libraries
         run: |
           set -euo pipefail
-          mkdir -p bundled-libs
 
+          APP="release/MishPlayer.app"
+          FRAMEWORKS="$APP/Contents/Frameworks"
           BREW_PREFIX="$(brew --prefix)"
 
           for pattern in \
@@ -85,34 +84,24 @@ jobs:
           do
             for lib in "$BREW_PREFIX"/lib/$pattern; do
               [ -e "$lib" ] || continue
-              cp -L "$lib" bundled-libs/
+              cp -L "$lib" "$FRAMEWORKS/"
             done
           done
 
-          if ! compgen -G "bundled-libs/*.dylib" > /dev/null; then
-            echo "ERROR: No dynamic libraries were staged."
+          if ! compgen -G "$FRAMEWORKS/*.dylib" > /dev/null; then
+            echo "ERROR: No dynamic libraries were bundled."
             exit 1
           fi
-
-      - name: Create App Bundle
-        run: |
-          set -euo pipefail
-
-          APP="release/MishPlayer.app"
-
-          mkdir -p "$APP/Contents/MacOS"
-          mkdir -p "$APP/Contents/Frameworks"
-          mkdir -p "$APP/Contents/Resources"
-
-          cp src/builds/mishplayer "$APP/Contents/MacOS/mishplayer"
-          cp bundled-libs/*.dylib "$APP/Contents/Frameworks/"
-          chmod +x "$APP/Contents/MacOS/mishplayer"
 
           if [ -d assets ]; then
             cp -R assets/. "$APP/Contents/Resources/"
           fi
 
-          cat > "$APP/Contents/Info.plist" <<'EOF'
+      - name: Create Info.plist
+        run: |
+          set -euo pipefail
+
+          cat > release/MishPlayer.app/Contents/Info.plist <<'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -128,7 +117,7 @@ jobs:
               <key>CFBundlePackageType</key>
               <string>APPL</string>
               <key>LSMinimumSystemVersion</key>
-              <string>11.0</string>
+              <string>12.0</string>
           </dict>
           </plist>
           EOF
@@ -154,11 +143,11 @@ jobs:
             while IFS= read -r old_path; do
               [ -n "$old_path" ] || continue
 
-              LIBNAME="$(basename "$old_path")"
+              DEP="$(basename "$old_path")"
 
-              if [ -f "$FRAMEWORKS/$LIBNAME" ]; then
+              if [ -f "$FRAMEWORKS/$DEP" ]; then
                 install_name_tool -change \
-                  "$old_path" "@rpath/$LIBNAME" "$lib"
+                  "$old_path" "@rpath/$DEP" "$lib"
               fi
             done < <(
               otool -L "$lib" |
@@ -170,11 +159,11 @@ jobs:
           while IFS= read -r old_path; do
             [ -n "$old_path" ] || continue
 
-            LIBNAME="$(basename "$old_path")"
+            DEP="$(basename "$old_path")"
 
-            if [ -f "$FRAMEWORKS/$LIBNAME" ]; then
+            if [ -f "$FRAMEWORKS/$DEP" ]; then
               install_name_tool -change \
-                "$old_path" "@rpath/$LIBNAME" "$EXECUTABLE"
+                "$old_path" "@rpath/$DEP" "$EXECUTABLE"
             fi
           done < <(
             otool -L "$EXECUTABLE" |
@@ -182,7 +171,7 @@ jobs:
             grep -E '^(/opt/homebrew|/usr/local)/' || true
           )
 
-      - name: Verify app bundle
+      - name: Verify architecture and package
         run: |
           set -euo pipefail
 
@@ -193,22 +182,18 @@ jobs:
           test -x "$EXECUTABLE"
 
           file "$EXECUTABLE"
-          lipo "$EXECUTABLE" -verify_arch arm64
+          lipo "$EXECUTABLE" -verify_arch "${{ matrix.arch }}"
           otool -L "$EXECUTABLE"
 
-          echo "App bundle verified. No automatic launch or playback test."
-
-      - name: Archive app bundle
-        run: |
-          set -euo pipefail
-
           ditto -c -k --sequesterRsrc --keepParent \
-            release/MishPlayer.app \
-            release/MishPlayer-macOS-Apple-Silicon.zip
+            "$APP" \
+            "release/${{ matrix.artifact }}.zip"
 
-      - name: Upload Apple Silicon app
+          echo "Package created. Mish was not launched."
+
+      - name: Upload app
         uses: actions/upload-artifact@v4
         with:
-          name: MishPlayer-macOS-Apple-Silicon
-          path: release/MishPlayer-macOS-Apple-Silicon.zip
+          name: ${{ matrix.artifact }}
+          path: release/${{ matrix.artifact }}.zip
           if-no-files-found: error
