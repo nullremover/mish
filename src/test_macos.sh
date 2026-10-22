@@ -3,7 +3,7 @@
 set -e
 
 REPO="https://raw.githubusercontent.com/nullremover/mish/main"
-ROOT="${GITHUB_WORKSPACE:-$(pwd)}"
+ROOT="$GITHUB_WORKSPACE/mish/src"
 
 echo "Mish macOS test setup"
 
