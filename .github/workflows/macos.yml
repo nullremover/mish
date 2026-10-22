@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-arm64:
-    name: Build ARM64
+    name: Build Apple Silicon
     runs-on: macos-14
 
     steps:
@@ -22,6 +22,7 @@ jobs:
         working-directory: src
         run: |
           set -euo pipefail
+
           brew_prefix="$(brew --prefix)"
           echo "Homebrew prefix: $brew_prefix"
           uname -m
@@ -37,47 +38,13 @@ jobs:
       - name: Upload ARM64 binary
         uses: actions/upload-artifact@v4
         with:
-          name: mish-arm64
+          name: mishplayer-arm64
           path: artifacts/mishplayer-arm64
           if-no-files-found: error
 
-  build-x86_64:
-    name: Build Intel x86_64
-    runs-on: macos-15-intel
-
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: brew install sfml taglib
-
-      - name: Build x86_64
-        working-directory: src
-        run: |
-          set -euo pipefail
-          brew_prefix="$(brew --prefix)"
-          echo "Homebrew prefix: $brew_prefix"
-          uname -m
-
-          make clean
-          make -f Makefile.macos \
-            ARCH=x86_64 \
-            BREW_PREFIX="$brew_prefix"
-
-          mkdir -p ../artifacts
-          cp builds/mishplayer-x86_64 ../artifacts/mishplayer-x86_64
-
-      - name: Upload Intel binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: mish-x86_64
-          path: artifacts/mishplayer-x86_64
-          if-no-files-found: error
-
-  package-universal:
-    name: Package Universal App
-    needs: [build-arm64, build-x86_64]
+  package-app:
+    name: Package Apple Silicon App
+    needs: build-arm64
     runs-on: macos-14
 
     steps:
@@ -87,32 +54,21 @@ jobs:
       - name: Download ARM64 binary
         uses: actions/download-artifact@v4
         with:
-          name: mish-arm64
+          name: mishplayer-arm64
           path: slices/arm64
 
-      - name: Download Intel binary
-        uses: actions/download-artifact@v4
-        with:
-          name: mish-x86_64
-          path: slices/x86_64
-
-      - name: Install ARM64 packaging dependencies
+      - name: Install packaging dependencies
         run: brew install sfml taglib
 
-      - name: Create Universal Binary
+      - name: Prepare app bundle
         run: |
           set -euo pipefail
+
           mkdir -p src/builds
+          cp slices/arm64/mishplayer-arm64 src/builds/mishplayer
+          chmod +x src/builds/mishplayer
 
-          lipo -create \
-            slices/arm64/mishplayer-arm64 \
-            slices/x86_64/mishplayer-x86_64 \
-            -output src/builds/mishplayer
-
-          file src/builds/mishplayer
-          lipo -info src/builds/mishplayer
-
-      - name: Stage ARM64 dynamic libraries
+      - name: Stage dynamic libraries
         run: |
           set -euo pipefail
           mkdir -p bundled-libs
@@ -133,20 +89,27 @@ jobs:
             done
           done
 
-      - name: Create App Bundle Structure
+          if ! compgen -G "bundled-libs/*.dylib" > /dev/null; then
+            echo "ERROR: No dynamic libraries were staged."
+            exit 1
+          fi
+
+      - name: Create App Bundle
         run: |
           set -euo pipefail
 
-          APP=release/MishPlayer.app
+          APP="release/MishPlayer.app"
+
           mkdir -p "$APP/Contents/MacOS"
           mkdir -p "$APP/Contents/Frameworks"
           mkdir -p "$APP/Contents/Resources"
 
           cp src/builds/mishplayer "$APP/Contents/MacOS/mishplayer"
           cp bundled-libs/*.dylib "$APP/Contents/Frameworks/"
+          chmod +x "$APP/Contents/MacOS/mishplayer"
 
           if [ -d assets ]; then
-            cp -r assets/. "$APP/Contents/Resources/"
+            cp -R assets/. "$APP/Contents/Resources/"
           fi
 
           cat > "$APP/Contents/Info.plist" <<'EOF'
@@ -173,7 +136,8 @@ jobs:
       - name: Fix dynamic library paths
         run: |
           set -euo pipefail
-          APP=release/MishPlayer.app
+
+          APP="release/MishPlayer.app"
           EXECUTABLE="$APP/Contents/MacOS/mishplayer"
           FRAMEWORKS="$APP/Contents/Frameworks"
 
@@ -183,12 +147,15 @@ jobs:
 
           for lib in "$FRAMEWORKS"/*.dylib; do
             [ -f "$lib" ] || continue
+
             LIBNAME="$(basename "$lib")"
             install_name_tool -id "@rpath/$LIBNAME" "$lib"
 
             while IFS= read -r old_path; do
               [ -n "$old_path" ] || continue
+
               LIBNAME="$(basename "$old_path")"
+
               if [ -f "$FRAMEWORKS/$LIBNAME" ]; then
                 install_name_tool -change \
                   "$old_path" "@rpath/$LIBNAME" "$lib"
@@ -202,7 +169,9 @@ jobs:
 
           while IFS= read -r old_path; do
             [ -n "$old_path" ] || continue
+
             LIBNAME="$(basename "$old_path")"
+
             if [ -f "$FRAMEWORKS/$LIBNAME" ]; then
               install_name_tool -change \
                 "$old_path" "@rpath/$LIBNAME" "$EXECUTABLE"
@@ -213,41 +182,33 @@ jobs:
             grep -E '^(/opt/homebrew|/usr/local)/' || true
           )
 
-      - name: Final Verification
+      - name: Verify app bundle
         run: |
           set -euo pipefail
-          APP=release/MishPlayer.app
+
+          APP="release/MishPlayer.app"
           EXECUTABLE="$APP/Contents/MacOS/mishplayer"
 
           plutil -lint "$APP/Contents/Info.plist"
+          test -x "$EXECUTABLE"
+
           file "$EXECUTABLE"
-          lipo -info "$EXECUTABLE"
+          lipo "$EXECUTABLE" -verify_arch arm64
           otool -L "$EXECUTABLE"
 
-          lipo "$EXECUTABLE" -verify_arch arm64 x86_64
+          echo "App bundle verified. No automatic launch or playback test."
 
-      - name: Upload Universal App
+      - name: Archive app bundle
+        run: |
+          set -euo pipefail
+
+          ditto -c -k --sequesterRsrc --keepParent \
+            release/MishPlayer.app \
+            release/MishPlayer-macOS-Apple-Silicon.zip
+
+      - name: Upload Apple Silicon app
         uses: actions/upload-artifact@v4
         with:
-          name: MishPlayer-macOS-Universal
-          path: release/MishPlayer.app
+          name: MishPlayer-macOS-Apple-Silicon
+          path: release/MishPlayer-macOS-Apple-Silicon.zip
           if-no-files-found: error
-
-     
-      - name: Debug executable permissions
-        run: |
-          APP="./release/MishPlayer.app/Contents/MacOS/mishplayer"
-          ls -l "$APP"
-          file "$APP"
-          test -f "$APP" && echo "Executable file exists"
-          chmod +x "$APP"
-          ls -l "$APP"
-
-      - name: Run Mish debug session
-        run: |
-          set -o pipefail
-          cd "$GITHUB_WORKSPACE"
-
-          MISH_TEST_AUTOPLAY=1 \
-            ./release/MishPlayer.app/Contents/MacOS/mishplayer \
-            2>&1 | tee "$RUNNER_TEMP/mish-debug.log"
