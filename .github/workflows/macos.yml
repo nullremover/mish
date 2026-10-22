@@ -171,6 +171,10 @@ jobs:
             grep -E '^(/opt/homebrew|/usr/local)/' || true
           )
 
+    - name: Verify ZIP archive
+      run: |
+        unzip -t "MishPlayer-macOS-Intel.zip"
+    
       - name: Verify architecture and package
         run: |
           set -euo pipefail
@@ -190,6 +194,7 @@ jobs:
             "release/${{ matrix.artifact }}.zip"
 
           echo "Package created. Mish was not launched."
+
 
       - name: Upload app
         uses: actions/upload-artifact@v4
