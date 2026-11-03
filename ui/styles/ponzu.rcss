@@ -1,0 +1,129 @@
+/* Ponzu: tea orange #923C01, bright orange #FF5F00, warm darks, restrained cream. */
+
+body {
+	width: 100%;
+	height: 100%;
+	font-family: "Segoe UI";
+	font-size: 14dp;
+	color: #F3E9DC;
+}
+div, img, h1 { display: block; }
+h1 { font-size: 26dp; font-weight: bold; margin: 0 0 6dp 0; }
+.muted { color: rgba(243, 233, 220, 150); }
+.tiny { font-size: 11dp; }
+.error { color: #FF8A5C; min-height: 18dp; margin: 6dp 0; }
+.spacer { flex: 1 1 0; }
+
+.wordmark { font-family: "Dela Gothic One"; color: #FF5F00; }
+.wordmark.small { font-size: 18dp; padding: 0 14dp; }
+.wordmark.large { font-size: 40dp; margin-bottom: 8dp; }
+.wordmark.huge  { font-size: 84dp; margin-top: 18dp; }
+
+/* ---------- citrus slice (pure RCSS) ---------- */
+.slice { position: relative; }
+.slice.big  { width: 220dp; height: 220dp; }
+.slice.mini { width: 90dp; height: 90dp; }
+.spin { position: absolute; left: 0; top: 0; width: 100%; height: 100%; animation: 14s linear infinite spin; }
+.rind, .pith, .flesh { position: absolute; border-radius: 1000dp; }
+.rind  { left: 0;    top: 0;    width: 100%; height: 100%; background-color: #923C01; }
+.pith  { left: 5%;   top: 5%;   width: 90%;  height: 90%;  background-color: #F3E9DC; }
+.flesh { left: 9%;   top: 9%;   width: 82%;  height: 82%;  background-color: #FF5F00; }
+.spoke { position: absolute; left: 50%; top: 9%; width: 3dp; height: 82%; margin-left: -1.5dp; background-color: #F3E9DC; }
+.spoke.s1 { transform: rotate(45deg); }
+.spoke.s2 { transform: rotate(90deg); }
+.spoke.s3 { transform: rotate(135deg); }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* ---------- splash + setup ---------- */
+#splash, #setup {
+	width: 100%; height: 100%;
+	background-color: #140D08;
+	flex-direction: column; align-items: center; justify-content: center;
+	text-align: center;
+}
+#splash { display: flex; }
+#setup  { display: none; }
+.tagline { color: rgba(243, 233, 220, 170); margin: 6dp 0 28dp 0; font-size: 16dp; }
+.stage { font-size: 16dp; color: #F3E9DC; }
+
+.card {
+	width: 520dp; padding: 32dp; border-radius: 18dp; text-align: left;
+	background-color: #24160D; border: 1dp #3A2415;
+}
+.path { margin: 18dp 0 4dp 0; padding: 12dp; border-radius: 10dp; background-color: #140D08; color: rgba(243, 233, 220, 200); }
+.row-buttons { display: flex; margin-top: 14dp; }
+
+.btn { padding: 10dp 18dp; margin-right: 10dp; border-radius: 999dp; background-color: #3A2415; cursor: pointer; }
+.btn:hover { background-color: #4A2E1A; }
+.btn.primary { background-color: #FF5F00; color: #140D08; font-weight: bold; }
+.btn.primary:hover { background-color: #FF7A2A; }
+
+/* ---------- main shell ---------- */
+#main { display: none; width: 100%; height: 100%; }
+#shell { display: flex; flex-direction: column; width: 100%; height: 100%; background-color: rgba(14, 9, 5, 120); }
+
+#titlebar { display: flex; align-items: center; height: 38dp; background-color: rgba(14, 9, 5, 210); }
+.wbtn { width: 46dp; height: 38dp; line-height: 38dp; text-align: center; color: rgba(243, 233, 220, 200); cursor: pointer; }
+.wbtn:hover { background-color: rgba(255, 255, 255, 25); }
+.wbtn.close:hover { background-color: #C42B1C; color: #fff; }
+
+#middle { display: flex; flex: 1 1 0; }
+#sidebar {
+	display: flex; flex-direction: column; width: 230dp; padding: 18dp 12dp;
+	background-color: rgba(20, 12, 7, 215);
+}
+.nav { padding: 11dp 14dp; margin-bottom: 4dp; border-radius: 10dp; font-size: 16dp; cursor: pointer; }
+.nav:hover { background-color: rgba(255, 95, 0, 40); }
+.nav.on { background-color: #FF5F00; color: #140D08; font-weight: bold; }
+.side-btn { padding: 8dp 14dp; margin-bottom: 4dp; border-radius: 8dp; color: rgba(243, 233, 220, 190); cursor: pointer; }
+.side-btn:hover { background-color: rgba(255, 255, 255, 25); }
+#sync-text { padding: 8dp 14dp; }
+
+#content { display: flex; flex-direction: column; flex: 1 1 0; padding: 28dp 34dp; }
+
+/* Listen Now */
+#greeting { font-family: "Dela Gothic One"; font-size: 40dp; }
+#phrase { font-size: 18dp; color: #FF5F00; margin: 4dp 0 26dp 0; }
+.hero { display: flex; }
+.art-wrap { width: 300dp; height: 300dp; margin-right: 28dp; }
+#hero-art { width: 300dp; height: 300dp; border-radius: 18dp; }
+.noart { display: flex; align-items: center; justify-content: center; width: 300dp; height: 300dp; border-radius: 18dp; background-color: #24160D; }
+.noart.small { width: 56dp; height: 56dp; border-radius: 8dp; }
+.np { flex: 1 1 0; padding: 22dp; border-radius: 18dp; background-color: rgba(20, 12, 7, 185); }
+.np-title { font-family: "Dela Gothic One"; font-size: 28dp; margin: 6dp 0; }
+.np-artist { font-size: 18dp; margin-bottom: 4dp; }
+
+/* Songs */
+#view-songs { flex-direction: column; flex: 1 1 0; }
+.songs-head { display: flex; align-items: baseline; }
+.songs-head .muted { margin-left: 12dp; }
+#songs-list { flex: 1 1 0; overflow-y: auto; border-radius: 12dp; background-color: rgba(20, 12, 7, 185); padding: 6dp; }
+.row { display: flex; padding: 8dp 12dp; border-radius: 8dp; cursor: pointer; }
+.row:hover { background-color: rgba(255, 95, 0, 40); }
+.row.on { background-color: rgba(255, 95, 0, 90); font-weight: bold; }
+.c-n { width: 44dp; color: rgba(243, 233, 220, 120); }
+.c-t { flex: 3 1 0; }
+.c-a { flex: 2 1 0; color: rgba(243, 233, 220, 170); }
+.c-b { flex: 2 1 0; color: rgba(243, 233, 220, 120); }
+
+scrollbarvertical { width: 10dp; }
+scrollbarvertical slidertrack { background-color: transparent; }
+scrollbarvertical sliderbar { width: 10dp; border-radius: 5dp; background-color: #923C01; }
+scrollbarvertical sliderbar:hover { background-color: #FF5F00; }
+scrollbarvertical sliderarrowdec, scrollbarvertical sliderarrowinc { display: none; }
+
+/* Persistent bottom player */
+#bar { display: flex; align-items: center; height: 92dp; padding: 0 20dp; background-color: rgba(14, 9, 5, 235); }
+.bar-art { width: 56dp; height: 56dp; margin-right: 14dp; }
+#bar-art { width: 56dp; height: 56dp; border-radius: 8dp; }
+.bar-meta { width: 260dp; }
+.bar-title { font-weight: bold; font-size: 15dp; }
+.bar-mid { flex: 1 1 0; }
+.controls { display: flex; justify-content: center; margin-bottom: 8dp; }
+.cbtn { padding: 6dp 14dp; margin: 0 3dp; border-radius: 999dp; background-color: rgba(255, 255, 255, 20); cursor: pointer; }
+.cbtn:hover { background-color: rgba(255, 255, 255, 45); }
+.cbtn.play { background-color: #FF5F00; color: #140D08; font-weight: bold; width: 64dp; text-align: center; }
+.seek-row { display: flex; align-items: center; }
+#bar-time { width: 110dp; text-align: right; margin-right: 12dp; }
+#seek { flex: 1 1 0; height: 10dp; border-radius: 5dp; background-color: rgba(255, 255, 255, 30); cursor: pointer; }
+#seek-fill { width: 0%; height: 100%; border-radius: 5dp; background-color: #FF5F00; }

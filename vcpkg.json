@@ -1,0 +1,11 @@
+{
+  "name": "ponzu",
+  "version-string": "0.3.0",
+  "description": "Ponzu: a citrusy refresh of the Mish music player",
+  "dependencies": [
+    "sfml",
+    "taglib",
+    "freetype",
+    { "name": "curl", "platform": "!windows" }
+  ]
+}

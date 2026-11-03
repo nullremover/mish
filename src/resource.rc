@@ -1,0 +1,5 @@
+// Define the Application Icon for Windows Explorer (Always use index 1)
+1 ICON "mishicon.ico"
+
+// Define a binary raw data resource for SFML to load into memory
+101 RCDATA "mishicon.png"

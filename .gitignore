@@ -1,0 +1,9 @@
+build/
+out/
+vcpkg_installed/
+*.exe
+*.o
+build-vcpkg/
+vcpkg/
+.vcpkg/
+*.log

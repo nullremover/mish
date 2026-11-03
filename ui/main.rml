@@ -1,0 +1,117 @@
+<rml>
+<head>
+	<title>Ponzu</title>
+	<link type="text/rcss" href="styles/ponzu.rcss"/>
+</head>
+<body>
+
+<!-- ============ Splash: shown while the library loads ============ -->
+<div id="splash">
+	<div class="slice big">
+		<div class="spin">
+			<div class="rind"></div><div class="pith"></div><div class="flesh"></div>
+			<div class="spoke s0"></div><div class="spoke s1"></div><div class="spoke s2"></div><div class="spoke s3"></div>
+		</div>
+	</div>
+	<div class="wordmark huge">ponzu</div>
+	<div class="tagline">a citrusy, sour little music player</div>
+	<div id="splash-stage" class="stage">Scanning your library</div>
+	<div id="splash-count" class="muted">0 songs found</div>
+</div>
+
+<!-- ============ First-time setup ============ -->
+<div id="setup">
+	<div class="card">
+		<div class="wordmark large">ponzu</div>
+		<h1>Where's your music?</h1>
+		<div class="muted">Pick the folder that holds your mp3, ogg, wav and flac files. Subfolders are included.</div>
+		<div id="setup-path" class="path">no folder selected</div>
+		<div id="setup-error" class="error"></div>
+		<div class="row-buttons">
+			<div class="btn" data-action="browse">Browse...</div>
+			<div class="btn primary" data-action="savefolder">Save and scan</div>
+		</div>
+	</div>
+</div>
+
+<!-- ============ Main app ============ -->
+<div id="main">
+<div id="shell">
+
+	<div id="titlebar" data-action="drag">
+		<div class="wordmark small">ponzu</div>
+		<div class="spacer"></div>
+		<div class="wbtn" data-action="minimize">&#8211;</div>
+		<div class="wbtn" data-action="maximize">&#9633;</div>
+		<div class="wbtn close" data-action="close">&#10005;</div>
+	</div>
+
+	<div id="middle">
+		<div id="sidebar">
+			<div id="nav-listen" class="nav on" data-action="view" data-arg="listen">Listen Now</div>
+			<div id="nav-songs" class="nav" data-action="view" data-arg="songs">Songs</div>
+			<div class="spacer"></div>
+			<div id="btn-calm" class="side-btn" data-action="calm">Visualizer: Portal</div>
+			<div id="btn-popup" class="side-btn" data-action="popup">Popup: on</div>
+			<div class="side-btn" data-action="rescan">Force scan</div>
+			<div class="side-btn" data-action="change-folder">Change music folder</div>
+			<div id="sync-text" class="muted tiny"></div>
+		</div>
+
+		<div id="content">
+			<!-- Listen Now -->
+			<div id="view-listen">
+				<div id="greeting">Good afternoon.</div>
+				<div id="phrase">Squeezing the day for something good.</div>
+				<div class="hero">
+					<div class="art-wrap">
+						<img id="hero-art" style="display: none;"/>
+						<div id="hero-noart" class="noart"><div class="slice mini"><div class="rind"></div><div class="pith"></div><div class="flesh"></div></div></div>
+					</div>
+					<div class="np">
+						<div class="muted tiny">NOW PLAYING</div>
+						<div id="hero-title" class="np-title">&#8211;</div>
+						<div id="hero-artist" class="np-artist"></div>
+						<div id="hero-album" class="muted"></div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Songs -->
+			<div id="view-songs" style="display: none;">
+				<div class="songs-head"><h1>Songs</h1><div id="songs-count" class="muted"></div></div>
+				<div id="songs-list"></div>
+			</div>
+		</div>
+	</div>
+
+	<div id="bar">
+		<div class="bar-art">
+			<img id="bar-art" style="display: none;"/>
+			<div id="bar-noart" class="noart small"></div>
+		</div>
+		<div class="bar-meta">
+			<div id="bar-title" class="bar-title"></div>
+			<div id="bar-artist" class="muted"></div>
+		</div>
+		<div class="bar-mid">
+			<div class="controls">
+				<div class="cbtn" data-action="shuffle">Shuffle</div>
+				<div class="cbtn" data-action="prev">Prev</div>
+				<div id="btn-play" class="cbtn play" data-action="play">Play</div>
+				<div class="cbtn" data-action="next">Next</div>
+				<div class="cbtn" data-action="stop">Stop</div>
+				<div id="btn-repeat" class="cbtn" data-action="repeat">Repeat off</div>
+			</div>
+			<div class="seek-row">
+				<div id="bar-time" class="muted tiny">00:00 / 00:00</div>
+				<div id="seek" data-action="seek"><div id="seek-fill"></div></div>
+			</div>
+		</div>
+	</div>
+
+</div>
+</div>
+
+</body>
+</rml>
