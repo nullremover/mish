@@ -2,8 +2,6 @@
 
 A refresh of **mish**, the minimalist music player. Citrusy, sour, and it says hello.
 
-Status: milestone 1 foundation. The code has **not been compiled yet** (see `PONZU_MILESTONE_1_AUDIT.md`).
-
 ## Build (Windows, dynamic SFML via vcpkg)
 
 ```
@@ -27,3 +25,5 @@ src/main.cpp  wiring only
 ```
 
 License: GPL v3 (see LICENSE.txt).
+
+kinda half cut(will fix later to-do)
